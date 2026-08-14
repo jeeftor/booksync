@@ -6,11 +6,14 @@
   let testResults = $state({})
 
   let editingId = $state(null) // null = creating a new account
+  let defaults = $state({ tlsProxyUrl: '', tlsProxyKey: '' })
   let form = $state(emptyForm())
   let rawCookieHeader = $state('')
   let cookieParseStatus = $state(null) // { ok: bool, message: string } | null
   let rawDeviceTokenInput = $state('')
   let deviceTokenParseStatus = $state(null)
+  let draftTestStatus = $state(null) // { ok: bool, message: string } | null
+  let testingDraft = $state(false)
 
   function emptyForm() {
     return {
@@ -20,8 +23,8 @@
       sessionId: '',
       xMain: '',
       deviceToken: '',
-      tlsProxyUrl: 'http://booksync-tls-proxy:8080',
-      tlsProxyKey: '',
+      tlsProxyUrl: defaults.tlsProxyUrl || 'http://booksync-tls-proxy:8080',
+      tlsProxyKey: defaults.tlsProxyKey || '',
     }
   }
 
@@ -30,6 +33,19 @@
       accounts = await api.kindleAccounts.list()
     } catch (e) {
       error = e.message
+    }
+  }
+
+  // This deployment may already know the TLS proxy URL/key (e.g. from the
+  // same docker-compose .env the booksync-tls-proxy sidecar reads its own
+  // AUTH_KEYS from) - fetch it once and use it to pre-fill new accounts, so
+  // that shared value never has to be hand-copied into the UI at all.
+  async function loadDefaults() {
+    try {
+      defaults = await api.kindleAccounts.defaults()
+      if (!editingId) form = emptyForm()
+    } catch {
+      /* no defaults configured - fields just start blank */
     }
   }
 
@@ -134,6 +150,7 @@
     cookieParseStatus = null
     rawDeviceTokenInput = ''
     deviceTokenParseStatus = null
+    draftTestStatus = null
     error = ''
   }
 
@@ -153,6 +170,7 @@
     cookieParseStatus = null
     rawDeviceTokenInput = ''
     deviceTokenParseStatus = null
+    draftTestStatus = null
     error = ''
   }
 
@@ -163,6 +181,28 @@
     const onlyOnCreate = ['ubidMain', 'atMain', 'sessionId', 'xMain', 'deviceToken', 'tlsProxyKey']
     const required = editingId ? always : [...always, ...onlyOnCreate]
     return required.filter((f) => !form[f]?.trim())
+  }
+
+  // Tests the in-progress form directly against Amazon/the TLS proxy without
+  // saving anything first, so a bad cookie/device-token/proxy-key value gets
+  // caught before it's committed.
+  async function testDraft() {
+    draftTestStatus = null
+    error = ''
+    const missing = missingFields()
+    if (missing.length) {
+      error = `Missing required field(s) to test: ${missing.join(', ')}`
+      return
+    }
+    testingDraft = true
+    try {
+      const res = await api.kindleAccounts.testDraft(form)
+      draftTestStatus = { ok: true, message: `Connected — ${res.bookCount} books found in library` }
+    } catch (e) {
+      draftTestStatus = { ok: false, message: e.message }
+    } finally {
+      testingDraft = false
+    }
   }
 
   async function save() {
@@ -203,6 +243,7 @@
   }
 
   load()
+  loadDefaults()
 </script>
 
 <div class="space-y-6 max-w-3xl">
@@ -218,40 +259,76 @@
       {@const steps = [
         {
           title: 'Install a cookie-export extension',
-          body: 'e.g. Cookie-Editor (Chrome/Firefox, open source).',
+          body: [
+            'e.g. ',
+            { b: 'Cookie-Editor' },
+            ' (Chrome/Firefox, open source). ',
+            { i: "You only need this once per browser." },
+          ],
           link: { href: 'https://cookie-editor.com/', label: 'cookie-editor.com' },
         },
         {
           title: 'Log into read.amazon.com',
-          body: "Open your library in that browser so you're fully signed in.",
+          body: [
+            "Open your library in that browser so you're ",
+            { b: 'fully signed in' },
+            ' — not just the Amazon marketing page.',
+          ],
           link: { href: 'https://read.amazon.com', label: 'read.amazon.com' },
         },
         {
           title: 'Export cookies and parse them below',
-          body: 'Cookie-Editor icon → Export → any format (Header String, JSON, or Netscape all work — auto-detected).',
+          body: [
+            'Cookie-Editor icon → ',
+            { b: 'Export' },
+            ' → ',
+            { i: 'any format works' },
+            ' (Header String, JSON, or Netscape — ',
+            { b: 'auto-detected' },
+            ').',
+          ],
         },
         {
           title: 'Grab the device token from DevTools',
-          body: 'F12 → Network tab → reload → find getDeviceToken?serialNumber=...&deviceType=.... Paste the full URL below.',
+          body: [
+            'F12 → ',
+            { b: 'Network' },
+            ' tab → reload → find a request to ',
+            { code: 'getDeviceToken?serialNumber=...&deviceType=...' },
+            '. Paste the ',
+            { i: 'full request URL' },
+            ' below.',
+          ],
         },
         {
           title: 'Confirm the TLS proxy settings',
-          body: "Defaults are correct for this homelab's booksync-tls-proxy sidecar — just fill in its API key.",
+          body: [
+            { b: 'Already filled in below' },
+            " if this deployment knows its tls-client-api sidecar's URL/key — otherwise point them at your own ",
+          ],
           link: { href: 'https://github.com/bogdanfinn/tls-client-api', label: 'tls-client-api' },
+          bodyAfter: [' instance and its ', { code: 'api_auth_keys' }, ' value.'],
         },
       ]}
       <ol class="space-y-3">
         {#each steps as step, i}
           <li class="flex gap-3">
-            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-800 text-xs font-semibold text-slate-300 ring-1 ring-slate-700">
+            <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-amber-500/20 to-amber-600/5 text-xs font-bold text-amber-300 ring-1 ring-amber-500/30">
               {i + 1}
             </span>
             <div class="text-sm">
-              <div class="font-medium text-slate-200">{step.title}</div>
-              <div class="text-slate-400">
-                {step.body}
+              <div class="font-semibold text-slate-100">{step.title}</div>
+              <div class="text-slate-400 leading-relaxed">
+                {#each step.body as part}
+                  {#if typeof part === 'string'}{part}{:else if part.b}<strong class="text-slate-200 font-semibold">{part.b}</strong>{:else if part.i}<em class="text-slate-300 italic">{part.i}</em>{:else if part.code}<code class="text-amber-300/90 bg-slate-950/60 rounded px-1 py-0.5 text-xs">{part.code}</code>{/if}
+                {/each}
                 {#if step.link}
-                  &mdash; <a class="text-sky-400 underline decoration-sky-800 hover:decoration-sky-400" href={step.link.href} target="_blank" rel="noreferrer">{step.link.label}</a>
+                  <a class="text-sky-400 underline decoration-sky-800 hover:decoration-sky-400 hover:text-sky-300 transition-colors" href={step.link.href} target="_blank" rel="noreferrer">{step.link.label}</a>
+                {/if}
+                {#if step.bodyAfter}
+                  {#each step.bodyAfter as part}
+                    {#if typeof part === 'string'}{part}{:else if part.code}<code class="text-amber-300/90 bg-slate-950/60 rounded px-1 py-0.5 text-xs">{part.code}</code>{/if}
+                  {/each}
                 {/if}
               </div>
             </div>
@@ -260,8 +337,8 @@
       </ol>
 
       <div class="grid gap-3 sm:grid-cols-2">
-        <div class="rounded-lg border border-slate-800 bg-slate-950/40 p-3 space-y-2">
-          <div class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+        <div class="rounded-lg border border-slate-800 bg-slate-950/40 p-3 space-y-2 transition-colors focus-within:border-amber-500/40">
+          <div class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
             Cookie export
           </div>
@@ -273,13 +350,13 @@
           <div class="flex items-center justify-between gap-2">
             <button class="btn-sm" onclick={parseCookieHeader}>Parse</button>
             {#if cookieParseStatus}
-              <span class="text-xs {cookieParseStatus.ok ? 'text-emerald-400' : 'text-amber-400'}">{cookieParseStatus.message}</span>
+              <span class="text-xs font-medium {cookieParseStatus.ok ? 'text-emerald-400' : 'text-amber-400'}">{cookieParseStatus.message}</span>
             {/if}
           </div>
         </div>
 
-        <div class="rounded-lg border border-slate-800 bg-slate-950/40 p-3 space-y-2">
-          <div class="flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-slate-400">
+        <div class="rounded-lg border border-slate-800 bg-slate-950/40 p-3 space-y-2 transition-colors focus-within:border-amber-500/40">
+          <div class="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-400">
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-8.49a6 6 0 0 0 0 8.49M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/></svg>
             Device token
           </div>
@@ -291,14 +368,21 @@
           <div class="flex items-center justify-between gap-2">
             <button class="btn-sm" onclick={parseDeviceToken}>Parse</button>
             {#if deviceTokenParseStatus}
-              <span class="text-xs {deviceTokenParseStatus.ok ? 'text-emerald-400' : 'text-amber-400'}">{deviceTokenParseStatus.message}</span>
+              <span class="text-xs font-medium {deviceTokenParseStatus.ok ? 'text-emerald-400' : 'text-amber-400'}">{deviceTokenParseStatus.message}</span>
             {/if}
           </div>
         </div>
       </div>
+
+      {#if defaults.tlsProxyKey}
+        <p class="text-xs text-emerald-400/90 flex items-center gap-1.5">
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+          TLS proxy URL and API key were pre-filled from this deployment's configuration — <em class="italic">no need to copy them from anywhere.</em>
+        </p>
+      {/if}
     {:else}
       <p class="text-xs text-slate-400">
-        Leave any cookie/device-token/TLS-key field blank to keep its current value — only fill in what you want to change.
+        Leave any cookie/device-token/TLS-key field <em class="italic">blank</em> to keep its current value — only fill in what you want to change.
       </p>
     {/if}
 
@@ -312,9 +396,13 @@
       <input class="input" placeholder="TLS proxy URL" bind:value={form.tlsProxyUrl} />
       <input class="input" placeholder={editingId ? 'TLS proxy API key (leave blank to keep)' : 'TLS proxy API key'} bind:value={form.tlsProxyKey} />
     </div>
-    <div class="flex gap-2">
+    <div class="flex flex-wrap items-center gap-2">
       <button class="btn" onclick={save}>{editingId ? 'Save Changes' : 'Add Account'}</button>
+      <button class="btn-sm" onclick={testDraft} disabled={testingDraft}>{testingDraft ? 'Testing...' : 'Test Connection'}</button>
       {#if editingId}<button class="btn-sm" onclick={resetForm}>Cancel</button>{/if}
+      {#if draftTestStatus}
+        <span class="text-xs font-medium {draftTestStatus.ok ? 'text-emerald-400' : 'text-red-400'}">{draftTestStatus.message}</span>
+      {/if}
     </div>
     {#if error}<p class="text-red-400 text-sm">{error}</p>{/if}
   </div>

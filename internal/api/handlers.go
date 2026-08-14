@@ -88,6 +88,29 @@ func (h *Handlers) TestKindleAccount(c echo.Context) error {
 	return c.JSON(http.StatusOK, map[string]int{"bookCount": count})
 }
 
+// TestKindleAccountDraft verifies a not-yet-saved account (e.g. mid-way
+// through the "Add Account" form) so users can confirm their cookies/device
+// token/TLS proxy settings work before committing to save.
+func (h *Handlers) TestKindleAccountDraft(c echo.Context) error {
+	var in store.KindleAccount
+	if err := c.Bind(&in); err != nil {
+		return fail(c, http.StatusBadRequest, err)
+	}
+	count, err := h.svc.TestKindleAccountDraft(c.Request().Context(), in)
+	if err != nil {
+		return fail(c, http.StatusBadGateway, err)
+	}
+	return c.JSON(http.StatusOK, map[string]int{"bookCount": count})
+}
+
+// KindleAccountDefaults returns deployment-supplied defaults (e.g. this
+// homelab's tls-client-api sidecar URL/key from env vars) for the "Add
+// Account" form to pre-fill, so a value already sitting in the same
+// docker-compose .env as the sidecar doesn't have to be hand-copied.
+func (h *Handlers) KindleAccountDefaults(c echo.Context) error {
+	return c.JSON(http.StatusOK, h.kindleDefaults)
+}
+
 // --- Audiobookshelf users -----------------------------------------------
 
 func (h *Handlers) ListABSUsers(c echo.Context) error {

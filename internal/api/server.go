@@ -15,8 +15,9 @@ import (
 
 // Handlers holds shared dependencies for REST and MCP handlers.
 type Handlers struct {
-	svc *service.Service
-	log *slog.Logger
+	svc            *service.Service
+	log            *slog.Logger
+	kindleDefaults service.KindleAccountDefaults
 }
 
 // BuildInfo describes the running binary's build, injected via -ldflags at
@@ -30,11 +31,11 @@ type BuildInfo struct {
 
 // New builds the Echo server: REST API under /api, the MCP endpoint at /mcp,
 // and (if frontendFS is non-nil) the built Svelte SPA served at /.
-func New(svc *service.Service, log *slog.Logger, build BuildInfo, frontendFS fs.FS) *echo.Echo {
+func New(svc *service.Service, log *slog.Logger, build BuildInfo, kindleDefaults service.KindleAccountDefaults, frontendFS fs.FS) *echo.Echo {
 	if log == nil {
 		log = slog.Default()
 	}
-	h := &Handlers{svc: svc, log: log}
+	h := &Handlers{svc: svc, log: log, kindleDefaults: kindleDefaults}
 
 	e := echo.New()
 	e.HideBanner = true
@@ -47,10 +48,12 @@ func New(svc *service.Service, log *slog.Logger, build BuildInfo, frontendFS fs.
 	api.GET("/health", h.Health(build))
 
 	api.GET("/kindle-accounts", h.ListKindleAccounts)
+	api.GET("/kindle-accounts/defaults", h.KindleAccountDefaults)
 	api.POST("/kindle-accounts", h.CreateKindleAccount)
 	api.PUT("/kindle-accounts/:id", h.UpdateKindleAccount)
 	api.DELETE("/kindle-accounts/:id", h.DeleteKindleAccount)
 	api.POST("/kindle-accounts/:id/test", h.TestKindleAccount)
+	api.POST("/kindle-accounts/test", h.TestKindleAccountDraft)
 
 	api.GET("/abs-users", h.ListABSUsers)
 	api.POST("/abs-users", h.CreateABSUser)

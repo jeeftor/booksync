@@ -29,10 +29,12 @@ export const api = {
 
   kindleAccounts: {
     list: () => get('/kindle-accounts'),
+    defaults: () => get('/kindle-accounts/defaults'),
     create: (body) => post('/kindle-accounts', body),
     update: (id, body) => put(`/kindle-accounts/${id}`, body),
     remove: (id) => del(`/kindle-accounts/${id}`),
     test: (id) => post(`/kindle-accounts/${id}/test`),
+    testDraft: (body) => post('/kindle-accounts/test', body),
   },
 
   absUsers: {

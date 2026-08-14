@@ -58,7 +58,11 @@ func runServe(cmd *cobra.Command, args []string) error {
 		frontendFS = nil
 	}
 
-	e := api.New(svc, log, api.BuildInfo{Version: version, Commit: commit, Date: date}, frontendFS)
+	kindleDefaults := service.KindleAccountDefaults{
+		TLSProxyURL: os.Getenv("BOOKSYNC_DEFAULT_TLS_PROXY_URL"),
+		TLSProxyKey: os.Getenv("BOOKSYNC_DEFAULT_TLS_PROXY_KEY"),
+	}
+	e := api.New(svc, log, api.BuildInfo{Version: version, Commit: commit, Date: date}, kindleDefaults, frontendFS)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

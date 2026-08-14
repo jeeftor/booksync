@@ -98,18 +98,36 @@ func (s *Service) DeleteKindleAccount(ctx context.Context, id int64) error {
 	return store.DeleteKindleAccount(s.db, id)
 }
 
-// TestKindleAccount verifies the stored credentials work by initializing a
-// session and returns how many books were found in the library.
+// TestKindleAccount verifies a saved account's stored credentials work by
+// initializing a session and returns how many books were found in the
+// library.
 func (s *Service) TestKindleAccount(ctx context.Context, id int64) (int, error) {
 	acc, err := store.GetKindleAccount(s.db, id)
 	if err != nil {
 		return 0, err
 	}
-	c, err := kindleclient.New(ctx, *acc)
+	return s.TestKindleAccountDraft(ctx, *acc)
+}
+
+// TestKindleAccountDraft verifies a not-yet-saved set of credentials (e.g.
+// from the "Add Account" form) the same way TestKindleAccount does, without
+// requiring the account to exist in the database first.
+func (s *Service) TestKindleAccountDraft(ctx context.Context, acc store.KindleAccount) (int, error) {
+	c, err := kindleclient.New(ctx, acc)
 	if err != nil {
 		return 0, err
 	}
 	return len(c.Library()), nil
+}
+
+// KindleAccountDefaults are values a self-hosted deployment can supply via
+// env vars so users don't have to hand-copy a value that's already sitting
+// in the same docker-compose .env as the tls-client-api sidecar's own
+// AUTH_KEYS. Purely a form-prefill convenience - never required, and users
+// can always override them.
+type KindleAccountDefaults struct {
+	TLSProxyURL string `json:"tlsProxyUrl,omitempty"`
+	TLSProxyKey string `json:"tlsProxyKey,omitempty"`
 }
 
 // --- Audiobookshelf users -----------------------------------------------
