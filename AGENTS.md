@@ -62,16 +62,23 @@ badge in the web UI header (hover for commit + build date). `internal/api.BuildI
 type; thread any new consumer through `cmd/serve.go`'s `api.New(...)` call rather than adding a
 separate ad-hoc version string.
 
-Every push to `master` builds and publishes `ghcr.io/jeeftor/booksync:latest` and `:<sha>` via
-`.github/workflows/release.yml` (multi-arch amd64+arm64), so the homelab deployment can always pull
-a fresh image after a change lands. Pushing a `v*` git tag additionally publishes
-`ghcr.io/jeeftor/booksync:vX.Y.Z` and makes that the version string baked into the binary/UI badge,
-instead of a raw commit SHA.
+**Docker images are only built/published for a `v*` git tag push**, never a plain `master` push
+(matches `ics-mcp`'s convention) — `.github/workflows/release.yml`'s `test` job runs on every push
+for fast feedback, but the `meta`/`docker-amd64`/`docker-arm64`/`manifest` jobs are gated on
+`startsWith(github.ref, 'refs/tags/v')`. This means "push a version tag" is *always* the trigger for
+a new pullable image (`ghcr.io/jeeftor/booksync:vX.Y.Z` + `:latest` + `:<sha>`, multi-arch
+amd64+arm64) — there's no ambiguity about whether `latest` actually contains a given change.
+
+**Practical rule for whoever/whatever is making changes to this repo: after any change meant to be
+deployed, bump and push a version tag** (`git tag -a vX.Y.Z -m "..." && git push origin vX.Y.Z`)
+before telling the user it's ready to pull. Don't leave a change sitting on `master` unreleased if
+the intent was to get it running.
 
 Follow SemVer deliberately, matching `ics-mcp`'s convention: patch releases for scoped bug fixes,
 minor releases for a coherent group of user-facing additions (don't tag a string of patches for a
-stream of unrelated features — batch them into the next minor and tag once at a verified
-checkpoint).
+stream of unrelated features — batch them into the next minor). In practice for this project that
+usually means: patch bump per work session/fix, minor bump when a session adds a distinct new
+capability.
 
 ## Configuration
 
