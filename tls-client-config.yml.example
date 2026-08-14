@@ -1,0 +1,30 @@
+# Config for the bogdanfinn/tls-client-api sidecar used to spoof a real
+# Chrome TLS fingerprint when talking to Amazon's private Kindle API.
+# Copy this file to tls-client-config.yml, set your own api_auth_keys, and
+# use that same key as a Kindle account's "TLS proxy API key" in bookSync.
+env: prod
+app_project: tls-client
+app_family: tls-client
+app_name: api
+
+log:
+  handlers:
+    main:
+      formatter: console
+      level: info
+      timestamp_format: '15:04:05:000'
+      type: iowriter
+      writer: stdout
+
+api:
+  port: 8080
+  mode: release
+  timeout:
+    read: 120s
+    write: 120s
+    idle: 120s
+
+api_auth_keys: ['change-me']
+
+api_cors_allowed_headers: ['X-API-KEY', 'Content-Type']
+api_cors_allowed_methods: ['POST', 'GET']

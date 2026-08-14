@@ -1,0 +1,20 @@
+@import 'tailwindcss';
+
+body {
+  @apply bg-slate-950 text-slate-100;
+}
+
+@layer components {
+  .input {
+    @apply bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-sm w-full;
+  }
+  .btn {
+    @apply bg-indigo-600 hover:bg-indigo-500 text-white text-sm px-3 py-1.5 rounded;
+  }
+  .btn-sm {
+    @apply bg-slate-800 hover:bg-slate-700 text-xs px-2 py-1 rounded disabled:opacity-50;
+  }
+  .btn-sm-danger {
+    @apply bg-red-900 hover:bg-red-800 text-xs px-2 py-1 rounded;
+  }
+}

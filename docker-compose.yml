@@ -1,0 +1,28 @@
+services:
+  booksync:
+    build: .
+    # image: ghcr.io/jeeftor/booksync:latest
+    container_name: booksync
+    restart: unless-stopped
+    ports:
+      - "8686:8686"
+    environment:
+      - BOOKSYNC_LOG_LEVEL=info
+      - BOOKSYNC_PORT=8686
+    volumes:
+      - ./data:/config
+    depends_on:
+      - tls-proxy
+
+  # Amazon TLS-fingerprints requests to read.amazon.com; this sidecar spoofs a
+  # real Chrome handshake so the Kindle client can talk to it at all. Point a
+  # Kindle account's "TLS proxy URL" at http://tls-proxy:8080 and set the API
+  # key below to match `api_auth_keys` in tls-client-config.yml.
+  tls-proxy:
+    image: bogdanfinn/tls-client-api:latest
+    container_name: booksync-tls-proxy
+    restart: unless-stopped
+    volumes:
+      - ./tls-client-config.yml:/app/config.yml:ro
+    # Copy tls-client-config.yml.example to tls-client-config.yml and set your
+    # own api_auth_keys before starting.
