@@ -68,7 +68,9 @@
     <h2 class="font-medium mb-2">New Profile</h2>
     <p class="text-xs text-slate-400 mb-3">
       A profile pairs one Kindle account with one Audiobookshelf user and owns its own confirmed book
-      mappings. Use one profile per person.
+      mappings. Use one profile per person. Add a Kindle account and an Audiobookshelf user first (see
+      the other two tabs), then create a profile here, then open <strong>Mappings</strong> to find and
+      confirm book pairings and sync.
     </p>
     <div class="grid grid-cols-2 gap-2">
       <input class="input" placeholder="Label (e.g. Jeff)" bind:value={form.label} />

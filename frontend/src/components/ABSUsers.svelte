@@ -47,9 +47,12 @@
 <div class="space-y-6 max-w-2xl">
   <div class="rounded-lg border border-slate-800 p-4">
     <h2 class="font-medium mb-2">Add Audiobookshelf User</h2>
-    <p class="text-xs text-slate-400 mb-3">
-      Find the API token by logging in as this user, going to their account settings page.
-    </p>
+    <ol class="text-xs text-slate-400 mb-3 space-y-1 list-decimal list-inside">
+      <li>Log into your Audiobookshelf server as the user you want to sync.</li>
+      <li>Go to <strong>Settings &rarr; Users &rarr; (your account) &rarr; API Token</strong> and copy it.</li>
+      <li>Enter your server's base URL (e.g. <code>https://abs.example.com</code>, or an internal Docker hostname
+        like <code>http://audiobookshelf:80</code> if bookSync runs in the same Compose stack) and the token below.</li>
+    </ol>
     <div class="grid grid-cols-1 gap-2">
       <input class="input" placeholder="Label (e.g. Jeff)" bind:value={form.label} />
       <input class="input" placeholder="Server URL (https://abs.example.com)" bind:value={form.baseUrl} />
