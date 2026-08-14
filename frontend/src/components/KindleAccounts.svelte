@@ -5,6 +5,7 @@
   let error = $state('')
   let testResults = $state({})
 
+  let editingId = $state(null) // null = creating a new account
   let form = $state(emptyForm())
   let rawCookieHeader = $state('')
   let cookieParseStatus = $state('')
@@ -77,15 +78,58 @@
     deviceTokenParseStatus = '✓ Using pasted value as-is'
   }
 
-  async function create() {
+  function resetForm() {
+    editingId = null
+    form = emptyForm()
+    rawCookieHeader = ''
+    cookieParseStatus = ''
+    rawDeviceTokenInput = ''
+    deviceTokenParseStatus = ''
     error = ''
+  }
+
+  function startEdit(acc) {
+    editingId = acc.id
+    form = {
+      label: acc.label,
+      ubidMain: '',
+      atMain: '',
+      sessionId: '',
+      xMain: '',
+      deviceToken: '',
+      tlsProxyUrl: acc.tlsProxyUrl,
+      tlsProxyKey: '',
+    }
+    rawCookieHeader = ''
+    cookieParseStatus = ''
+    rawDeviceTokenInput = ''
+    deviceTokenParseStatus = ''
+    error = ''
+  }
+
+  // Required for a brand-new account; when editing, secret fields left blank
+  // just mean "keep the current value" (see service.UpdateKindleAccount).
+  function missingFields() {
+    const always = ['label', 'tlsProxyUrl']
+    const onlyOnCreate = ['ubidMain', 'atMain', 'sessionId', 'xMain', 'deviceToken', 'tlsProxyKey']
+    const required = editingId ? always : [...always, ...onlyOnCreate]
+    return required.filter((f) => !form[f]?.trim())
+  }
+
+  async function save() {
+    error = ''
+    const missing = missingFields()
+    if (missing.length) {
+      error = `Missing required field(s): ${missing.join(', ')}`
+      return
+    }
     try {
-      await api.kindleAccounts.create(form)
-      form = emptyForm()
-      rawCookieHeader = ''
-      cookieParseStatus = ''
-      rawDeviceTokenInput = ''
-      deviceTokenParseStatus = ''
+      if (editingId) {
+        await api.kindleAccounts.update(editingId, form)
+      } else {
+        await api.kindleAccounts.create(form)
+      }
+      resetForm()
       await load()
     } catch (e) {
       error = e.message
@@ -95,6 +139,7 @@
   async function remove(id) {
     if (!confirm('Delete this Kindle account? Profiles using it will also be removed.')) return
     await api.kindleAccounts.remove(id)
+    if (editingId === id) resetForm()
     await load()
   }
 
@@ -113,65 +158,76 @@
 
 <div class="space-y-6 max-w-3xl">
   <div class="rounded-lg border border-slate-800 p-4 space-y-4">
-    <h2 class="font-medium">Add Kindle Account</h2>
+    <h2 class="font-medium">{editingId ? 'Edit Kindle Account' : 'Add Kindle Account'}</h2>
 
-    <ol class="text-sm text-slate-400 space-y-3 list-decimal list-inside">
-      <li>
-        Install a cookie-export browser extension — e.g.
-        <a class="text-sky-400 underline" href="https://cookie-editor.com/" target="_blank" rel="noreferrer">Cookie-Editor</a>
-        (Chrome/Firefox, open source).
-      </li>
-      <li>
-        Log into <a class="text-sky-400 underline" href="https://read.amazon.com" target="_blank" rel="noreferrer">read.amazon.com</a>
-        in that browser (open your library so you're fully signed in).
-      </li>
-      <li>
-        Click the Cookie-Editor icon &rarr; <strong>Export</strong> &rarr; <strong>Header String</strong> (copies a single
-        <code>ubid-main=...; at-main=...; session-id=...; x-main=...</code> string). Paste it below and click Parse — it'll
-        fill in the 4 cookie fields for you.
-      </li>
-      <li>
-        Open DevTools (F12) &rarr; <strong>Network</strong> tab, reload the page, and find a request to
-        <code>getDeviceToken?serialNumber=...&amp;deviceType=...</code>. Paste that full request URL (or just the
-        <code>serialNumber</code> value) into the device token box below and click Parse.
-      </li>
-      <li>
-        Leave the TLS proxy fields as the defaults if you're running bookSync in this homelab's Docker Compose stack
-        (<code>booksync-tls-proxy</code> sidecar); otherwise point them at your own
-        <a class="text-sky-400 underline" href="https://github.com/bogdanfinn/tls-client-api" target="_blank" rel="noreferrer">tls-client-api</a>
-        instance and its <code>api_auth_keys</code> value.
-      </li>
-    </ol>
+    {#if !editingId}
+      <ol class="text-sm text-slate-400 space-y-3 list-decimal list-inside">
+        <li>
+          Install a cookie-export browser extension — e.g.
+          <a class="text-sky-400 underline" href="https://cookie-editor.com/" target="_blank" rel="noreferrer">Cookie-Editor</a>
+          (Chrome/Firefox, open source).
+        </li>
+        <li>
+          Log into <a class="text-sky-400 underline" href="https://read.amazon.com" target="_blank" rel="noreferrer">read.amazon.com</a>
+          in that browser (open your library so you're fully signed in).
+        </li>
+        <li>
+          Click the Cookie-Editor icon &rarr; <strong>Export</strong> &rarr; <strong>Header String</strong> (copies a single
+          <code>ubid-main=...; at-main=...; session-id=...; x-main=...</code> string). Paste it below and click Parse — it'll
+          fill in the 4 cookie fields for you.
+        </li>
+        <li>
+          Open DevTools (F12) &rarr; <strong>Network</strong> tab, reload the page, and find a request to
+          <code>getDeviceToken?serialNumber=...&amp;deviceType=...</code>. Paste that full request URL (or just the
+          <code>serialNumber</code> value) into the device token box below and click Parse.
+        </li>
+        <li>
+          Leave the TLS proxy fields as the defaults if you're running bookSync in this homelab's Docker Compose stack
+          (<code>booksync-tls-proxy</code> sidecar) — but you still need to fill in its <strong>TLS proxy API key</strong>
+          yourself (the <code>AUTH_KEYS</code>/<code>api_auth_keys</code> value it was configured with). Otherwise point
+          the URL at your own
+          <a class="text-sky-400 underline" href="https://github.com/bogdanfinn/tls-client-api" target="_blank" rel="noreferrer">tls-client-api</a>
+          instance.
+        </li>
+      </ol>
 
-    <div class="space-y-2 border-t border-slate-800 pt-3">
-      <label class="text-xs text-slate-400" for="raw-cookie">Paste Cookie header (from Cookie-Editor or DevTools)</label>
-      <div class="flex gap-2">
-        <input id="raw-cookie" class="input flex-1" placeholder="ubid-main=...; at-main=...; session-id=...; x-main=..." bind:value={rawCookieHeader} />
-        <button class="btn-sm" onclick={parseCookieHeader}>Parse</button>
+      <div class="space-y-2 border-t border-slate-800 pt-3">
+        <label class="text-xs text-slate-400" for="raw-cookie">Paste Cookie header (from Cookie-Editor or DevTools)</label>
+        <div class="flex gap-2">
+          <input id="raw-cookie" class="input flex-1" placeholder="ubid-main=...; at-main=...; session-id=...; x-main=..." bind:value={rawCookieHeader} />
+          <button class="btn-sm" onclick={parseCookieHeader}>Parse</button>
+        </div>
+        {#if cookieParseStatus}<p class="text-xs text-slate-400">{cookieParseStatus}</p>{/if}
       </div>
-      {#if cookieParseStatus}<p class="text-xs text-slate-400">{cookieParseStatus}</p>{/if}
-    </div>
 
-    <div class="space-y-2">
-      <label class="text-xs text-slate-400" for="raw-device-token">Paste getDeviceToken request URL (or bare serialNumber)</label>
-      <div class="flex gap-2">
-        <input id="raw-device-token" class="input flex-1" placeholder="https://read.amazon.com/service/web/register/getDeviceToken?serialNumber=...&deviceType=..." bind:value={rawDeviceTokenInput} />
-        <button class="btn-sm" onclick={parseDeviceToken}>Parse</button>
+      <div class="space-y-2">
+        <label class="text-xs text-slate-400" for="raw-device-token">Paste getDeviceToken request URL (or bare serialNumber)</label>
+        <div class="flex gap-2">
+          <input id="raw-device-token" class="input flex-1" placeholder="https://read.amazon.com/service/web/register/getDeviceToken?serialNumber=...&deviceType=..." bind:value={rawDeviceTokenInput} />
+          <button class="btn-sm" onclick={parseDeviceToken}>Parse</button>
+        </div>
+        {#if deviceTokenParseStatus}<p class="text-xs text-slate-400">{deviceTokenParseStatus}</p>{/if}
       </div>
-      {#if deviceTokenParseStatus}<p class="text-xs text-slate-400">{deviceTokenParseStatus}</p>{/if}
-    </div>
+    {:else}
+      <p class="text-xs text-slate-400">
+        Leave any cookie/device-token/TLS-key field blank to keep its current value — only fill in what you want to change.
+      </p>
+    {/if}
 
     <div class="grid grid-cols-2 gap-2 border-t border-slate-800 pt-3">
       <input class="input col-span-2" placeholder="Label (e.g. Family Kindle)" bind:value={form.label} />
-      <input class="input" placeholder="ubid-main" bind:value={form.ubidMain} />
-      <input class="input" placeholder="at-main" bind:value={form.atMain} />
-      <input class="input" placeholder="session-id" bind:value={form.sessionId} />
-      <input class="input" placeholder="x-main" bind:value={form.xMain} />
-      <input class="input col-span-2" placeholder="Device token (serialNumber)" bind:value={form.deviceToken} />
+      <input class="input" placeholder={editingId ? 'ubid-main (leave blank to keep)' : 'ubid-main'} bind:value={form.ubidMain} />
+      <input class="input" placeholder={editingId ? 'at-main (leave blank to keep)' : 'at-main'} bind:value={form.atMain} />
+      <input class="input" placeholder={editingId ? 'session-id (leave blank to keep)' : 'session-id'} bind:value={form.sessionId} />
+      <input class="input" placeholder={editingId ? 'x-main (leave blank to keep)' : 'x-main'} bind:value={form.xMain} />
+      <input class="input col-span-2" placeholder={editingId ? 'Device token (leave blank to keep)' : 'Device token (serialNumber)'} bind:value={form.deviceToken} />
       <input class="input" placeholder="TLS proxy URL" bind:value={form.tlsProxyUrl} />
-      <input class="input" placeholder="TLS proxy API key" bind:value={form.tlsProxyKey} />
+      <input class="input" placeholder={editingId ? 'TLS proxy API key (leave blank to keep)' : 'TLS proxy API key'} bind:value={form.tlsProxyKey} />
     </div>
-    <button class="btn" onclick={create}>Add Account</button>
+    <div class="flex gap-2">
+      <button class="btn" onclick={save}>{editingId ? 'Save Changes' : 'Add Account'}</button>
+      {#if editingId}<button class="btn-sm" onclick={resetForm}>Cancel</button>{/if}
+    </div>
     {#if error}<p class="text-red-400 text-sm">{error}</p>{/if}
   </div>
 
@@ -179,11 +235,12 @@
     {#each accounts as acc (acc.id)}
       <div class="p-3 flex items-center justify-between">
         <div>
-          <div class="font-medium">{acc.label}</div>
+          <div class="font-medium">{acc.label || `Account #${acc.id}`}</div>
           {#if testResults[acc.id]}<div class="text-xs text-slate-400">{testResults[acc.id]}</div>{/if}
         </div>
         <div class="flex gap-2">
           <button class="btn-sm" onclick={() => test(acc.id)}>Test</button>
+          <button class="btn-sm" onclick={() => startEdit(acc)}>Edit</button>
           <button class="btn-sm-danger" onclick={() => remove(acc.id)}>Delete</button>
         </div>
       </div>

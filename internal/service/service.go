@@ -66,8 +66,32 @@ func (s *Service) CreateKindleAccount(ctx context.Context, a store.KindleAccount
 	return store.CreateKindleAccount(s.db, a)
 }
 
+// UpdateKindleAccount updates an existing account. Since ListKindleAccounts
+// masks secret fields, a caller round-tripping list data back through this
+// method would otherwise overwrite real cookies/tokens with the mask
+// placeholder; any blank or masked-looking field is left unchanged instead,
+// so the UI only needs to send the fields the user actually edited.
 func (s *Service) UpdateKindleAccount(ctx context.Context, a store.KindleAccount) (*store.KindleAccount, error) {
+	existing, err := store.GetKindleAccount(s.db, a.ID)
+	if err != nil {
+		return nil, err
+	}
+	a.UbidMain = keepIfBlank(a.UbidMain, existing.UbidMain)
+	a.AtMain = keepIfBlank(a.AtMain, existing.AtMain)
+	a.SessionID = keepIfBlank(a.SessionID, existing.SessionID)
+	a.XMain = keepIfBlank(a.XMain, existing.XMain)
+	a.DeviceToken = keepIfBlank(a.DeviceToken, existing.DeviceToken)
+	a.TLSProxyKey = keepIfBlank(a.TLSProxyKey, existing.TLSProxyKey)
 	return store.UpdateKindleAccount(s.db, a)
+}
+
+// keepIfBlank returns existing when incoming is empty or still the mask
+// placeholder (i.e. the caller didn't intend to change it), otherwise incoming.
+func keepIfBlank(incoming, existing string) string {
+	if incoming == "" || incoming == secretMask {
+		return existing
+	}
+	return incoming
 }
 
 func (s *Service) DeleteKindleAccount(ctx context.Context, id int64) error {
@@ -105,7 +129,14 @@ func (s *Service) CreateABSUser(ctx context.Context, u store.ABSUser) (*store.AB
 	return store.CreateABSUser(s.db, u)
 }
 
+// UpdateABSUser updates an existing user; see UpdateKindleAccount for why a
+// blank/masked apiToken is treated as "leave unchanged".
 func (s *Service) UpdateABSUser(ctx context.Context, u store.ABSUser) (*store.ABSUser, error) {
+	existing, err := store.GetABSUser(s.db, u.ID)
+	if err != nil {
+		return nil, err
+	}
+	u.APIToken = keepIfBlank(u.APIToken, existing.APIToken)
 	return store.UpdateABSUser(s.db, u)
 }
 
