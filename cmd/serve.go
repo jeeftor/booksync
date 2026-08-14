@@ -41,7 +41,7 @@ func init() {
 
 func runServe(cmd *cobra.Command, args []string) error {
 	log := newLogger()
-	log.Info("starting booksync", "version", version)
+	log.Info("starting booksync", "version", version, "commit", commit, "date", date)
 
 	dbPath := filepath.Join(dataDir, "booksync.db")
 	db, err := store.Open(dbPath)
@@ -58,7 +58,7 @@ func runServe(cmd *cobra.Command, args []string) error {
 		frontendFS = nil
 	}
 
-	e := api.New(svc, log, version, frontendFS)
+	e := api.New(svc, log, api.BuildInfo{Version: version, Commit: commit, Date: date}, frontendFS)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

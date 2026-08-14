@@ -5,10 +5,15 @@ package main
 
 import "github.com/jeeftor/bookSync/cmd"
 
-// Version is set via -ldflags "-X main.Version=..." at build time.
-var Version = "dev"
+// Version, Commit, and Date are set via -ldflags "-X main.X=..." at build
+// time (see Dockerfile and .github/workflows/release.yml).
+var (
+	Version = "dev"
+	Commit  = "unknown"
+	Date    = "unknown"
+)
 
 func main() {
-	cmd.SetVersion(Version)
+	cmd.SetBuildInfo(Version, Commit, Date)
 	cmd.Execute()
 }

@@ -56,14 +56,19 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version_tag: ${{ steps.tag.outputs.version_tag }}
+      build_date: ${{ steps.tag.outputs.build_date }}
+      display_version: ${{ steps.tag.outputs.display_version }}
     steps:
       - id: tag
         run: |
           if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
             echo "version_tag=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
+            echo "display_version=${GITHUB_REF#refs/tags/}" >> "$GITHUB_OUTPUT"
           else
             echo "version_tag=" >> "$GITHUB_OUTPUT"
+            echo "display_version=${GITHUB_SHA:0:12}" >> "$GITHUB_OUTPUT"
           fi
+          echo "build_date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
 
   docker-amd64:
     needs: [meta]
@@ -91,7 +96,10 @@ jobs:
           platforms: linux/amd64
           push: true
           tags: ${{ env.IMAGE }}:${{ github.sha }}-amd64
-          build-args: VERSION=${{ needs.meta.outputs.version_tag || github.sha }}
+          build-args: |
+            VERSION=${{ needs.meta.outputs.display_version }}
+            COMMIT=${{ github.sha }}
+            DATE=${{ needs.meta.outputs.build_date }}
           cache-from: type=gha,scope=amd64
           cache-to: type=gha,scope=amd64,mode=max
 
@@ -121,7 +129,10 @@ jobs:
           platforms: linux/arm64
           push: true
           tags: ${{ env.IMAGE }}:${{ github.sha }}-arm64
-          build-args: VERSION=${{ needs.meta.outputs.version_tag || github.sha }}
+          build-args: |
+            VERSION=${{ needs.meta.outputs.display_version }}
+            COMMIT=${{ github.sha }}
+            DATE=${{ needs.meta.outputs.build_date }}
           cache-from: type=gha,scope=arm64
           cache-to: type=gha,scope=arm64,mode=max
 

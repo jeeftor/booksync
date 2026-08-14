@@ -12,10 +12,15 @@ import (
 var (
 	dataDir = envOr("BOOKSYNC_DATA_DIR", "./data")
 	version = "dev"
+	commit  = "unknown"
+	date    = "unknown"
 )
 
-// SetVersion sets the application version (called from main.go via ldflags-injected build info if desired).
-func SetVersion(v string) { version = v }
+// SetBuildInfo sets the application's build metadata (called from main.go
+// with values injected via -ldflags at build time).
+func SetBuildInfo(v, c, d string) {
+	version, commit, date = v, c, d
+}
 
 func envOr(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {

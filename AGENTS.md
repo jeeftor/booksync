@@ -54,6 +54,25 @@ embeds `internal/webui/dist/` via `embed.FS`. The `build` target depends on `fro
 automatically. Without a real build, that directory contains a placeholder `index.html` explaining
 how to build it, so `go build ./...` still compiles on a fresh checkout.
 
+## Versioning & Releases
+
+Version/commit/build-date are injected via `-ldflags -X main.Version=... -X main.Commit=...
+-X main.Date=...` (see `Makefile` and `Dockerfile`), surfaced at `GET /api/health`, and shown as a
+badge in the web UI header (hover for commit + build date). `internal/api.BuildInfo` is the shared
+type; thread any new consumer through `cmd/serve.go`'s `api.New(...)` call rather than adding a
+separate ad-hoc version string.
+
+Every push to `master` builds and publishes `ghcr.io/jeeftor/booksync:latest` and `:<sha>` via
+`.github/workflows/release.yml` (multi-arch amd64+arm64), so the homelab deployment can always pull
+a fresh image after a change lands. Pushing a `v*` git tag additionally publishes
+`ghcr.io/jeeftor/booksync:vX.Y.Z` and makes that the version string baked into the binary/UI badge,
+instead of a raw commit SHA.
+
+Follow SemVer deliberately, matching `ics-mcp`'s convention: patch releases for scoped bug fixes,
+minor releases for a coherent group of user-facing additions (don't tag a string of patches for a
+stream of unrelated features — batch them into the next minor and tag once at a verified
+checkpoint).
+
 ## Configuration
 
 Env vars (`BOOKSYNC_*`) + CLI flags; see `.env.example`. Kindle accounts, ABS users, profiles, and

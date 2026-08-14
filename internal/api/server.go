@@ -19,9 +19,18 @@ type Handlers struct {
 	log *slog.Logger
 }
 
+// BuildInfo describes the running binary's build, injected via -ldflags at
+// build time (see Dockerfile and .github/workflows/release.yml). Reported by
+// /api/health and shown in the web UI so a running instance is identifiable.
+type BuildInfo struct {
+	Version string `json:"version"`
+	Commit  string `json:"commit"`
+	Date    string `json:"date"`
+}
+
 // New builds the Echo server: REST API under /api, the MCP endpoint at /mcp,
 // and (if frontendFS is non-nil) the built Svelte SPA served at /.
-func New(svc *service.Service, log *slog.Logger, version string, frontendFS fs.FS) *echo.Echo {
+func New(svc *service.Service, log *slog.Logger, build BuildInfo, frontendFS fs.FS) *echo.Echo {
 	if log == nil {
 		log = slog.Default()
 	}
@@ -35,7 +44,7 @@ func New(svc *service.Service, log *slog.Logger, version string, frontendFS fs.F
 	e.Use(middleware.CORS())
 
 	api := e.Group("/api")
-	api.GET("/health", h.Health(version))
+	api.GET("/health", h.Health(build))
 
 	api.GET("/kindle-accounts", h.ListKindleAccounts)
 	api.POST("/kindle-accounts", h.CreateKindleAccount)
@@ -65,7 +74,7 @@ func New(svc *service.Service, log *slog.Logger, version string, frontendFS fs.F
 
 	api.GET("/activity", h.RecentActivity)
 
-	mcpServer := buildMCPServer(h, version)
+	mcpServer := buildMCPServer(h, build.Version)
 	mcpHandler := mcp.NewStreamableHTTPHandler(func(*http.Request) *mcp.Server { return mcpServer }, nil)
 	e.Any("/mcp", echo.WrapHandler(mcpHandler))
 

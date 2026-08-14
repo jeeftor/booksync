@@ -16,6 +16,7 @@
 
   let active = $state('profiles')
   let selectedProfileId = $state(null)
+  let health = $state(null)
 
   function openMappings(profileId) {
     selectedProfileId = profileId
@@ -37,13 +38,32 @@
     }
   }
 
+  async function loadHealth() {
+    try {
+      health = await api.health()
+    } catch {
+      /* ignore - version badge just won't show */
+    }
+  }
+
   pickInitialTab()
+  loadHealth()
 </script>
 
 <div class="min-h-screen">
-  <header class="border-b border-slate-800 px-6 py-4">
-    <h1 class="text-xl font-semibold">bookSync</h1>
-    <p class="text-sm text-slate-400">Kindle &lt;-&gt; Audiobookshelf progress sync</p>
+  <header class="border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+    <div>
+      <h1 class="text-xl font-semibold">bookSync</h1>
+      <p class="text-sm text-slate-400">Kindle &lt;-&gt; Audiobookshelf progress sync</p>
+    </div>
+    {#if health?.version}
+      <span
+        class="text-xs font-mono text-slate-500 border border-slate-800 rounded px-2 py-1"
+        title={`commit ${health.commit}${health.date && health.date !== 'unknown' ? ` · built ${new Date(health.date).toLocaleString()}` : ''}`}
+      >
+        {health.version}
+      </span>
+    {/if}
   </header>
 
   <nav class="flex gap-1 border-b border-slate-800 px-6">

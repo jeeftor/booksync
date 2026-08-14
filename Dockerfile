@@ -12,6 +12,8 @@ FROM golang:1.25-alpine AS builder
 RUN apk add --no-cache git
 WORKDIR /app
 ARG VERSION=dev
+ARG COMMIT=unknown
+ARG DATE=unknown
 COPY go.mod go.sum ./
 RUN --mount=type=cache,target=/go/pkg/mod go mod download
 COPY . .
@@ -19,7 +21,7 @@ RUN rm -rf internal/webui/dist/*
 COPY --from=frontend /app/frontend/dist ./internal/webui/dist
 RUN --mount=type=cache,target=/go/pkg/mod \
     --mount=type=cache,target=/root/.cache/go-build \
-    CGO_ENABLED=0 go build -ldflags="-s -w -X main.Version=${VERSION}" -o booksync .
+    CGO_ENABLED=0 go build -ldflags="-s -w -X main.Version=${VERSION} -X main.Commit=${COMMIT} -X main.Date=${DATE}" -o booksync .
 
 ### Stage 3: runtime
 FROM alpine:3.24

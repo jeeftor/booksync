@@ -10,10 +10,11 @@ import (
 	"github.com/jeeftor/bookSync/internal/store"
 )
 
-// Health reports server version, used by the frontend and monitoring.
-func (h *Handlers) Health(version string) echo.HandlerFunc {
+// Health reports server status and build info, used by the frontend (to show
+// the running version) and for monitoring/liveness checks.
+func (h *Handlers) Health(build BuildInfo) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		return c.JSON(http.StatusOK, map[string]string{"status": "ok", "version": version})
+		return c.JSON(http.StatusOK, map[string]any{"status": "ok", "version": build.Version, "commit": build.Commit, "date": build.Date})
 	}
 }
 
