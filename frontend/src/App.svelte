@@ -1,4 +1,5 @@
 <script>
+  import { api } from './lib/api.js'
   import KindleAccounts from './components/KindleAccounts.svelte'
   import ABSUsers from './components/ABSUsers.svelte'
   import Profiles from './components/Profiles.svelte'
@@ -20,6 +21,23 @@
     selectedProfileId = profileId
     active = 'mappings'
   }
+
+  // First-run UX: if nothing is configured yet, land on whichever setup step
+  // comes first instead of the (empty) Profiles tab.
+  async function pickInitialTab() {
+    try {
+      const [kindleAccounts, absUsers] = await Promise.all([api.kindleAccounts.list(), api.absUsers.list()])
+      if (!kindleAccounts.length) {
+        active = 'kindle'
+      } else if (!absUsers.length) {
+        active = 'abs'
+      }
+    } catch {
+      /* ignore - default tab stands */
+    }
+  }
+
+  pickInitialTab()
 </script>
 
 <div class="min-h-screen">
